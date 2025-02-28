@@ -1,5 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: BUSL-1.1
 
 package awsauth
 
@@ -24,6 +24,12 @@ func (b *backend) pathConfigRotateRoot() *framework.Path {
 	return &framework.Path{
 		Pattern: "config/rotate-root",
 
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAWS,
+			OperationVerb:   "rotate",
+			OperationSuffix: "root-credentials",
+		},
+
 		Operations: map[logical.Operation]framework.OperationHandler{
 			logical.UpdateOperation: &framework.PathOperation{
 				Callback: b.pathConfigRotateRootUpdate,
@@ -36,6 +42,10 @@ func (b *backend) pathConfigRotateRoot() *framework.Path {
 }
 
 func (b *backend) pathConfigRotateRootUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	return b.rotateRoot(ctx, req)
+}
+
+func (b *backend) rotateRoot(ctx context.Context, req *logical.Request) (*logical.Response, error) {
 	// First get the AWS key and secret and validate that we _can_ rotate them.
 	// We need the read lock here to prevent anything else from mutating it while we're using it.
 	b.configMutex.Lock()

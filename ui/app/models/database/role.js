@@ -1,6 +1,6 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Model, { attr } from '@ember-data/model';
@@ -8,7 +8,7 @@ import { computed } from '@ember/object';
 import { alias } from '@ember/object/computed';
 import lazyCapabilities, { apiPath } from 'vault/macros/lazy-capabilities';
 import { expandAttributeMeta } from 'vault/utils/field-to-attrs';
-import { getRoleFields } from 'vault/utils/database-helpers';
+import { getRoleFields } from 'vault/utils/model-helpers/database-helpers';
 
 export default Model.extend({
   idPrefix: 'role/',
@@ -54,6 +54,12 @@ export default Model.extend({
       'Specifies the amount of time Vault should wait before rotating the password. The minimum is 5 seconds. Default is 24 hours.',
     helperTextEnabled: 'Vault will rotate password after',
   }),
+  skip_import_rotation: attr({
+    label: 'Skip initial rotation',
+    editType: 'boolean',
+    defaultValue: false,
+    subText: 'When unchecked, Vault automatically rotates the password upon creation',
+  }),
   creation_statements: attr('array', {
     editType: 'stringArray',
   }),
@@ -96,7 +102,7 @@ export default Model.extend({
   get showFields() {
     let fields = ['name', 'database', 'type'];
     fields = fields.concat(getRoleFields(this.type)).concat(['creation_statements']);
-    // elasticsearch does not support revocation statements: https://www.vaultproject.io/api-docs/secret/databases/elasticdb#parameters-1
+    // elasticsearch does not support revocation statements: https://developer.hashicorp.com/vault/api-docs/secret/databases/elasticdb#parameters-1
     if (this.database[0] !== 'elasticsearch') {
       fields = fields.concat(['revocation_statements']);
     }
@@ -110,6 +116,7 @@ export default Model.extend({
       'max_ttl',
       'username',
       'rotation_period',
+      'skip_import_rotation',
       'creation_statements',
       'creation_statement', // for editType: JSON
       'revocation_statements',
