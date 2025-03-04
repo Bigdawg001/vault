@@ -1,11 +1,9 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
-import camelizeKeys from 'vault/utils/camelize-object-keys';
 
 //* lookup OIDs: http://oid-info.com/basic-search.htm
-
 export const SUBJECT_OIDs = {
   common_name: '2.5.4.3',
   subject_serial_number: '2.5.4.5',
@@ -26,7 +24,7 @@ export const EXTENSION_OIDs = {
 };
 
 // these are allowed ext oids, but not parsed and passed to cross-signed certs
-export const IGNORED_OIDs = {
+export const OTHER_OIDs = {
   // These two extensions are controlled by the parent authority.
   authority_key_identifier: '2.5.29.35',
   authority_access_info: '1.3.6.1.5.5.7.1.1',
@@ -77,13 +75,12 @@ export const SIGNATURE_ALGORITHM_OIDs = {
   '1.3.101.112': '0', // Ed25519
 };
 
-// returns array of strings that correspond to model attributes
-// can be passed to display views in details pages containing certificates
-export const parsedParameters = [
-  ...Object.keys(camelizeKeys(SUBJECT_OIDs)),
-  ...Object.keys(camelizeKeys(EXTENSION_OIDs)),
-  ...Object.keys(camelizeKeys(SAN_TYPES)),
-  'usePss',
-  'notValidBefore',
-  'notValidAfter',
+// returns array of strings that correspond to possible returned values from parsing cert
+export const parsedParameterKeys = [
+  ...Object.keys(SUBJECT_OIDs),
+  ...Object.keys(EXTENSION_OIDs),
+  ...Object.keys(SAN_TYPES),
+  'use_pss',
+  'not_valid_before',
+  'not_valid_after',
 ];
