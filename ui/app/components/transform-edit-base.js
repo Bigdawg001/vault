@@ -1,9 +1,9 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
-import { inject as service } from '@ember/service';
+import { service } from '@ember/service';
 import { or } from '@ember/object/computed';
 import { isBlank } from '@ember/utils';
 import Component from '@ember/component';
@@ -27,6 +27,9 @@ export const removeFromList = (list, itemToRemove) => {
   return newList.uniq();
 };
 
+/**
+ * @type Class
+ */
 export default Component.extend(FocusOnInsertMixin, {
   store: service(),
   flashMessages: service(),
@@ -44,10 +47,10 @@ export default Component.extend(FocusOnInsertMixin, {
   },
 
   willDestroyElement() {
-    this._super(...arguments);
-    if (this.model && this.model.isError) {
+    if (this.model && this.model.isError && !this.model.isDestroyed && !this.model.isDestroying) {
       this.model.rollbackAttributes();
     }
+    this._super(...arguments);
   },
 
   transitionToRoute() {
