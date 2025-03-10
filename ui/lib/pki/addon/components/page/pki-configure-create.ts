@@ -1,17 +1,17 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Component from '@glimmer/component';
-import { inject as service } from '@ember/service';
+import { service } from '@ember/service';
 import { tracked } from '@glimmer/tracking';
-// TYPES
-import Store from '@ember-data/store';
-import Router from '@ember/routing/router';
-import FlashMessageService from 'vault/services/flash-messages';
-import PkiActionModel from 'vault/models/pki/action';
-import { Breadcrumb } from 'vault/vault/app-types';
+
+import type Store from '@ember-data/store';
+import type RouterService from '@ember/routing/router';
+import type FlashMessageService from 'vault/services/flash-messages';
+import type PkiActionModel from 'vault/models/pki/action';
+import type { Breadcrumb } from 'vault/vault/app-types';
 
 interface Args {
   config: PkiActionModel;
@@ -27,9 +27,9 @@ interface Args {
  * and form submission and cancel actions.
  */
 export default class PkiConfigureCreate extends Component<Args> {
-  @service declare readonly store: Store;
-  @service declare readonly router: Router;
   @service declare readonly flashMessages: FlashMessageService;
+  @service declare readonly store: Store;
+  @service('app-router') declare readonly router: RouterService;
 
   @tracked title = 'Configure PKI';
 

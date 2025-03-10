@@ -1,10 +1,10 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Model, { attr } from '@ember-data/model';
-import { inject as service } from '@ember/service';
+import { service } from '@ember/service';
 import { tracked } from '@glimmer/tracking';
 import lazyCapabilities, { apiPath } from 'vault/macros/lazy-capabilities';
 import { withFormFields } from 'vault/decorators/model-form-fields';
@@ -26,6 +26,15 @@ const validations = {
       message: `Issuer name must be unique across all issuers and not be the reserved value 'default'.`,
     },
   ],
+  keyName: [
+    {
+      validator(model) {
+        if (model.keyName === 'default') return false;
+        return true;
+      },
+      message: `Key name cannot be the reserved value 'default'`,
+    },
+  ],
 };
 
 /**
@@ -44,18 +53,21 @@ export default class PkiActionModel extends Model {
 
   /* actionType import */
   @attr('string') pemBundle;
+
+  // parsed attrs from parse-pki-cert util if certificate on response
+  @attr parsedCertificate;
+
   // readonly attrs returned after importing
   @attr importedIssuers;
   @attr importedKeys;
   @attr mapping;
-  @attr('string', { readOnly: true, masked: true }) certificate;
+  @attr('string', { readOnly: true, isCertificate: true }) certificate;
 
   /* actionType generate-root */
 
   // readonly attrs returned right after root generation
   @attr serialNumber;
-  @attr('string', { label: 'Issuing CA', readOnly: true, masked: true }) issuingCa;
-  @attr keyName;
+  @attr('string', { label: 'Issuing CA', readOnly: true, isCertificate: true }) issuingCa;
   // end of readonly
 
   @attr('string', {
@@ -64,9 +76,9 @@ export default class PkiActionModel extends Model {
   })
   type;
 
-  @attr('string') issuerName; // REQUIRED for generate-root actionType, cannot be "default"
+  @attr('string') issuerName;
 
-  @attr('string') keyName; // cannot be "default"
+  @attr('string') keyName;
 
   @attr('string', {
     defaultValue: 'default',
@@ -200,10 +212,10 @@ export default class PkiActionModel extends Model {
   @attr('string', { label: 'Issuer ID', readOnly: true, detailLinkTo: 'issuers.issuer.details' }) issuerId; // returned from generate-root action
 
   // For generating and signing a CSR
-  @attr('string', { label: 'CSR', masked: true }) csr;
+  @attr('string', { label: 'CSR', isCertificate: true }) csr;
   @attr caChain;
   @attr('string', { label: 'Key ID', detailLinkTo: 'keys.key.details' }) keyId;
-  @attr('string', { masked: true }) privateKey;
+  @attr('string', { isCertificate: true }) privateKey;
   @attr('string') privateKeyType;
 
   get backend() {

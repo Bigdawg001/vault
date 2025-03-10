@@ -1,5 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: BUSL-1.1
 
 package aws
 
@@ -16,6 +16,13 @@ import (
 func pathConfigRotateRoot(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config/rotate-root",
+
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAWS,
+			OperationSuffix: "root-iam-credentials",
+			OperationVerb:   "rotate",
+		},
+
 		Operations: map[logical.Operation]framework.OperationHandler{
 			logical.UpdateOperation: &framework.PathOperation{
 				Callback:                    b.pathConfigRotateRootUpdate,
@@ -30,8 +37,12 @@ func pathConfigRotateRoot(b *backend) *framework.Path {
 }
 
 func (b *backend) pathConfigRotateRootUpdate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	return b.rotateRoot(ctx, req)
+}
+
+func (b *backend) rotateRoot(ctx context.Context, req *logical.Request) (*logical.Response, error) {
 	// have to get the client config first because that takes out a read lock
-	client, err := b.clientIAM(ctx, req.Storage)
+	client, err := b.clientIAM(ctx, req.Storage, nil)
 	if err != nil {
 		return nil, err
 	}

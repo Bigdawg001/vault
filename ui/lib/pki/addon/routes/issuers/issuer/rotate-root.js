@@ -1,17 +1,17 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
-import PkiIssuerRoute from '../issuer';
-import { inject as service } from '@ember/service';
+import Route from '@ember/routing/route';
+import { service } from '@ember/service';
 import { hash } from 'rsvp';
 import { parseCertificate } from 'vault/utils/parse-pki-cert';
 import camelizeKeys from 'vault/utils/camelize-object-keys';
 import { withConfirmLeave } from 'core/decorators/confirm-leave';
 
 @withConfirmLeave('model.newRootModel')
-export default class PkiIssuerRotateRootRoute extends PkiIssuerRoute {
+export default class PkiIssuerRotateRootRoute extends Route {
   @service secretMountPath;
   @service store;
 
@@ -32,17 +32,22 @@ export default class PkiIssuerRotateRootRoute extends PkiIssuerRoute {
       oldRoot,
       newRootModel,
       parsingErrors,
+      backend: this.secretMountPath.currentPath,
     });
   }
 
   setupController(controller, resolvedModel) {
     super.setupController(controller, resolvedModel);
     controller.breadcrumbs = [
-      { label: 'secrets', route: 'secrets', linkExternal: true },
-      { label: this.secretMountPath.currentPath, route: 'overview' },
-      { label: 'issuers', route: 'issuers.index' },
-      { label: resolvedModel.oldRoot.id, route: 'issuers.issuer.details' },
-      { label: 'rotate root' },
+      { label: 'Secrets', route: 'secrets', linkExternal: true },
+      { label: this.secretMountPath.currentPath, route: 'overview', model: resolvedModel.oldRoot.backend },
+      { label: 'Issuers', route: 'issuers.index', model: resolvedModel.oldRoot.backend },
+      {
+        label: resolvedModel.oldRoot.id,
+        route: 'issuers.issuer.details',
+        models: [resolvedModel.oldRoot.backend, resolvedModel.oldRoot.id],
+      },
+      { label: 'Rotate Root' },
     ];
   }
 }

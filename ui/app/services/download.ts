@@ -1,6 +1,6 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Service from '@ember/service';
@@ -11,6 +11,7 @@ interface Extensions {
   hcl: string;
   sentinel: string;
   json: string;
+  jsonl: string;
   pem: string;
   txt: string;
 }
@@ -21,6 +22,7 @@ const EXTENSION_TO_MIME: Extensions = {
   hcl: 'text/plain',
   sentinel: 'text/plain',
   json: 'application/json',
+  jsonl: 'application/json',
   pem: 'application/x-pem-file',
   txt: 'text/plain',
 };

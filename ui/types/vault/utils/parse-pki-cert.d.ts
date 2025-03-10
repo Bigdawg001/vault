@@ -1,6 +1,6 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 interface ParsedCertificateData {
@@ -9,7 +9,7 @@ interface ParsedCertificateData {
 
   // certificate values
   common_name: string;
-  serial_number: string;
+  subject_serial_number: string;
   ou: string;
   organization: string;
   country: string;

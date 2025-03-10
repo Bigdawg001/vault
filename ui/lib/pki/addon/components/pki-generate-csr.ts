@@ -1,18 +1,20 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Component from '@glimmer/component';
 import { tracked } from '@glimmer/tracking';
-import { inject as service } from '@ember/service';
+import { service } from '@ember/service';
 import { action } from '@ember/object';
 import { task } from 'ember-concurrency';
 import { waitFor } from '@ember/test-waiters';
 import { expandAttributeMeta } from 'vault/utils/field-to-attrs';
-import FlashMessageService from 'vault/services/flash-messages';
-import PkiActionModel from 'vault/models/pki/action';
 import errorMessage from 'vault/utils/error-message';
+
+import type FlashMessageService from 'vault/services/flash-messages';
+import type PkiActionModel from 'vault/models/pki/action';
+import type { Model, ValidationMap } from 'vault/app-types';
 
 interface Args {
   model: PkiActionModel;
@@ -44,7 +46,7 @@ interface Args {
 export default class PkiGenerateCsrComponent extends Component<Args> {
   @service declare readonly flashMessages: FlashMessageService;
 
-  @tracked modelValidations = null;
+  @tracked modelValidations: ValidationMap | null = null;
   @tracked error: string | null = null;
   @tracked alert: string | null = null;
 
@@ -81,7 +83,7 @@ export default class PkiGenerateCsrComponent extends Component<Args> {
 
   @task
   @waitFor
-  *save(event: Event): Generator<Promise<boolean | PkiActionModel>> {
+  *save(event: Event): Generator<Promise<boolean | Model>> {
     event.preventDefault();
     try {
       const { model, onSave } = this.args;
@@ -90,9 +92,11 @@ export default class PkiGenerateCsrComponent extends Component<Args> {
         const useIssuer = yield this.getCapability();
         yield model.save({ adapterOptions: { actionType: 'generate-csr', useIssuer } });
         this.flashMessages.success('Successfully generated CSR.');
+        // This component shows the results, but call `onSave` for any side effects on parent
         if (onSave) {
           onSave();
         }
+        window?.scrollTo(0, 0);
       } else {
         this.modelValidations = state;
         this.alert = invalidFormMessage;

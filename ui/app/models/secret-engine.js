@@ -1,6 +1,6 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
 import Model, { attr, belongsTo } from '@ember-data/model';
@@ -8,6 +8,11 @@ import { computed } from '@ember/object'; // eslint-disable-line
 import { equal } from '@ember/object/computed'; // eslint-disable-line
 import { withModelValidations } from 'vault/decorators/model-validations';
 import { withExpandedAttributes } from 'vault/decorators/model-expanded-attributes';
+import { supportedSecretBackends } from 'vault/helpers/supported-secret-backends';
+import { isAddonEngine, allEngines, WIF_ENGINES } from 'vault/helpers/mountable-secret-engines';
+import { WHITESPACE_WARNING } from 'vault/utils/model-helpers/validators';
+
+const LINKED_BACKENDS = supportedSecretBackends();
 
 // identity will be managed separately and the inclusion
 // of the system backend is an implementation detail
@@ -18,8 +23,7 @@ const validations = {
     { type: 'presence', message: "Path can't be blank." },
     {
       type: 'containsWhiteSpace',
-      message:
-        "Path contains whitespace. If this is desired, you'll need to encode it with %20 in API requests.",
+      message: WHITESPACE_WARNING('path'),
       level: 'warn',
     },
   ],
@@ -48,7 +52,7 @@ export default class SecretEngineModel extends Model {
   local;
   @attr('boolean', {
     helpText:
-      'When enabled - if a seal supporting seal wrapping is specified in the configuration, all critical security parameters (CSPs) in this backend will be seal wrapped. (For K/V mounts, all values will be seal wrapped.) This can only be specified at mount time.',
+      'When enabled - if a seal supporting seal wrapping is specified in the configuration, all critical security parameters (CSPs) in this backend will be seal wrapped. (For KV mounts, all values will be seal wrapped.) This can only be specified at mount time.',
   })
   sealWrap;
   @attr('boolean') externalEntropyAccess;
@@ -63,14 +67,6 @@ export default class SecretEngineModel extends Model {
     defaultFormValue: 2, // Set the form to 2 by default
   })
   version;
-
-  // SSH specific attributes
-  @attr('string') privateKey;
-  @attr('string') publicKey;
-  @attr('boolean', {
-    defaultValue: true,
-  })
-  generateSigningKey;
 
   // AWS specific attributes
   @attr('string') lease;
@@ -104,15 +100,8 @@ export default class SecretEngineModel extends Model {
   deleteVersionAfter;
 
   /* GETTERS */
-  get modelTypeForKV() {
-    const engineType = this.engineType;
-    if ((engineType === 'kv' || engineType === 'generic') && this.version === 2) {
-      return 'secret-v2';
-    }
-    return 'secret';
-  }
   get isV2KV() {
-    return this.modelTypeForKV === 'secret-v2';
+    return this.version === 2 && (this.engineType === 'kv' || this.engineType === 'generic');
   }
 
   get attrs() {
@@ -126,13 +115,9 @@ export default class SecretEngineModel extends Model {
   }
 
   get icon() {
-    if (!this.engineType || this.engineType === 'kmip') {
-      return 'secrets';
-    }
-    if (this.engineType === 'keymgmt') {
-      return 'key';
-    }
-    return this.engineType;
+    const engineData = allEngines().find((engine) => engine.type === this.engineType);
+
+    return engineData?.glyph || 'lock';
   }
 
   get engineType() {
@@ -141,6 +126,32 @@ export default class SecretEngineModel extends Model {
 
   get shouldIncludeInList() {
     return !LIST_EXCLUDED_BACKENDS.includes(this.engineType);
+  }
+
+  get isSupportedBackend() {
+    return LINKED_BACKENDS.includes(this.engineType);
+  }
+
+  get backendLink() {
+    if (this.engineType === 'database') {
+      return 'vault.cluster.secrets.backend.overview';
+    }
+    if (isAddonEngine(this.engineType, this.version)) {
+      const { engineRoute } = allEngines().find((engine) => engine.type === this.engineType);
+      return `vault.cluster.secrets.backend.${engineRoute}`;
+    }
+    if (this.isV2KV) {
+      // if it's KV v2 but not registered as an addon, it's type generic
+      return 'vault.cluster.secrets.backend.kv.list';
+    }
+    return `vault.cluster.secrets.backend.list-root`;
+  }
+
+  get backendConfigurationLink() {
+    if (isAddonEngine(this.engineType, this.version)) {
+      return `vault.cluster.secrets.backend.${this.engineType}.configuration`;
+    }
+    return `vault.cluster.secrets.backend.configuration`;
   }
 
   get localDisplay() {
@@ -155,6 +166,7 @@ export default class SecretEngineModel extends Model {
       fields.push('config.defaultLeaseTtl', 'config.maxLeaseTtl');
     }
     fields.push(
+      'config.allowedManagedKeys',
       'config.auditNonHmacRequestKeys',
       'config.auditNonHmacResponseKeys',
       'config.passthroughRequestHeaders',
@@ -166,6 +178,10 @@ export default class SecretEngineModel extends Model {
     // version comes in as number not string
     if (type === 'kv' && parseInt(this.version, 10) === 2) {
       fields.push('casRequired', 'deleteVersionAfter', 'maxVersions');
+    }
+    // For WIF Secret engines, allow users to set the identity token key when mounting the engine.
+    if (WIF_ENGINES.includes(type)) {
+      fields.push('config.identityTokenKey');
     }
     return fields;
   }
@@ -189,6 +205,7 @@ export default class SecretEngineModel extends Model {
           ...CORE_OPTIONS,
           'config.defaultLeaseTtl',
           'config.maxLeaseTtl',
+          'config.allowedManagedKeys',
           ...STANDARD_CONFIG,
         ];
         break;
@@ -198,21 +215,43 @@ export default class SecretEngineModel extends Model {
           ...CORE_OPTIONS,
           'config.defaultLeaseTtl',
           'config.maxLeaseTtl',
+          'config.allowedManagedKeys',
           ...STANDARD_CONFIG,
         ];
         break;
       case 'database':
         // Highlight TTLs in default
         defaultFields = ['path', 'config.defaultLeaseTtl', 'config.maxLeaseTtl'];
+        optionFields = [...CORE_OPTIONS, 'config.allowedManagedKeys', ...STANDARD_CONFIG];
+        break;
+      case 'pki':
+        defaultFields = ['path', 'config.defaultLeaseTtl', 'config.maxLeaseTtl', 'config.allowedManagedKeys'];
         optionFields = [...CORE_OPTIONS, ...STANDARD_CONFIG];
         break;
       case 'keymgmt':
         // no ttl options for keymgmt
-        optionFields = [...CORE_OPTIONS, ...STANDARD_CONFIG];
+        optionFields = [...CORE_OPTIONS, 'config.allowedManagedKeys', ...STANDARD_CONFIG];
+        break;
+      case WIF_ENGINES.find((type) => type === this.engineType):
+        defaultFields = ['path'];
+        optionFields = [
+          ...CORE_OPTIONS,
+          'config.defaultLeaseTtl',
+          'config.maxLeaseTtl',
+          'config.identityTokenKey',
+          'config.allowedManagedKeys',
+          ...STANDARD_CONFIG,
+        ];
         break;
       default:
         defaultFields = ['path'];
-        optionFields = [...CORE_OPTIONS, 'config.defaultLeaseTtl', 'config.maxLeaseTtl', ...STANDARD_CONFIG];
+        optionFields = [
+          ...CORE_OPTIONS,
+          'config.defaultLeaseTtl',
+          'config.maxLeaseTtl',
+          'config.allowedManagedKeys',
+          ...STANDARD_CONFIG,
+        ];
         break;
     }
 
@@ -225,24 +264,6 @@ export default class SecretEngineModel extends Model {
   }
 
   /* ACTIONS */
-  saveCA(options) {
-    if (this.type !== 'ssh') {
-      return;
-    }
-    if (options.isDelete) {
-      this.privateKey = null;
-      this.publicKey = null;
-      this.generateSigningKey = false;
-    }
-    return this.save({
-      adapterOptions: {
-        options: options,
-        apiPath: 'config/ca',
-        attrsToSend: ['privateKey', 'publicKey', 'generateSigningKey'],
-      },
-    });
-  }
-
   saveZeroAddressConfig() {
     return this.save({
       adapterOptions: {

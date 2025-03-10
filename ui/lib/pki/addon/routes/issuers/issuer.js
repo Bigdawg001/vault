@@ -1,12 +1,15 @@
 /**
  * Copyright (c) HashiCorp, Inc.
- * SPDX-License-Identifier: MPL-2.0
+ * SPDX-License-Identifier: BUSL-1.1
  */
 
-import PkiIssuersListRoute from '.';
+import Route from '@ember/routing/route';
+import { service } from '@ember/service';
 
-// Single issuer index route extends issuers list route
-export default class PkiIssuerIndexRoute extends PkiIssuersListRoute {
+export default class PkiIssuerIndexRoute extends Route {
+  @service store;
+  @service secretMountPath;
+
   model() {
     const { issuer_ref } = this.paramsFor('issuers/issuer');
     return this.store.queryRecord('pki/issuer', {
@@ -18,9 +21,9 @@ export default class PkiIssuerIndexRoute extends PkiIssuersListRoute {
   setupController(controller, resolvedModel) {
     super.setupController(controller, resolvedModel);
     controller.breadcrumbs = [
-      { label: 'secrets', route: 'secrets', linkExternal: true },
-      { label: this.secretMountPath.currentPath, route: 'overview' },
-      { label: 'issuers', route: 'issuers.index' },
+      { label: 'Secrets', route: 'secrets', linkExternal: true },
+      { label: this.secretMountPath.currentPath, route: 'overview', model: this.secretMountPath.currentPath },
+      { label: 'Issuers', route: 'issuers.index', model: this.secretMountPath.currentPath },
     ];
   }
 }

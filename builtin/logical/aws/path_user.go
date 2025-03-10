@@ -1,5 +1,5 @@
 // Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: BUSL-1.1
 
 package aws
 
@@ -21,6 +21,12 @@ import (
 func pathUser(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "(creds|sts)/" + framework.GenericNameWithAtRegex("name"),
+
+		DisplayAttrs: &framework.DisplayAttributes{
+			OperationPrefix: operationPrefixAWS,
+			OperationVerb:   "generate",
+		},
+
 		Fields: map[string]*framework.FieldSchema{
 			"name": {
 				Type:        framework.TypeString,
@@ -29,21 +35,38 @@ func pathUser(b *backend) *framework.Path {
 			"role_arn": {
 				Type:        framework.TypeString,
 				Description: "ARN of role to assume when credential_type is " + assumedRoleCred,
+				Query:       true,
 			},
 			"ttl": {
 				Type:        framework.TypeDurationSecond,
 				Description: "Lifetime of the returned credentials in seconds",
 				Default:     3600,
+				Query:       true,
 			},
 			"role_session_name": {
 				Type:        framework.TypeString,
 				Description: "Session name to use when assuming role. Max chars: 64",
+				Query:       true,
+			},
+			"mfa_code": {
+				Type:        framework.TypeString,
+				Description: "MFA code to provide for session tokens",
 			},
 		},
 
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.ReadOperation:   b.pathCredsRead,
-			logical.UpdateOperation: b.pathCredsRead,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.ReadOperation: &framework.PathOperation{
+				Callback: b.pathCredsRead,
+				DisplayAttrs: &framework.DisplayAttributes{
+					OperationSuffix: "credentials|sts-credentials",
+				},
+			},
+			logical.UpdateOperation: &framework.PathOperation{
+				Callback: b.pathCredsRead,
+				DisplayAttrs: &framework.DisplayAttributes{
+					OperationSuffix: "credentials-with-parameters|sts-credentials-with-parameters",
+				},
+			},
 		},
 
 		HelpSynopsis:    pathUserHelpSyn,
@@ -88,6 +111,7 @@ func (b *backend) pathCredsRead(ctx context.Context, req *logical.Request, d *fr
 
 	roleArn := d.Get("role_arn").(string)
 	roleSessionName := d.Get("role_session_name").(string)
+	mfaCode := d.Get("mfa_code").(string)
 
 	var credentialType string
 	switch {
@@ -133,9 +157,11 @@ func (b *backend) pathCredsRead(ctx context.Context, req *logical.Request, d *fr
 		case !strutil.StrListContains(role.RoleArns, roleArn):
 			return logical.ErrorResponse(fmt.Sprintf("role_arn %q not in allowed role arns for Vault role %q", roleArn, roleName)), nil
 		}
-		return b.assumeRole(ctx, req.Storage, req.DisplayName, roleName, roleArn, role.PolicyDocument, role.PolicyArns, role.IAMGroups, ttl, roleSessionName)
+		return b.assumeRole(ctx, req.Storage, req.DisplayName, roleName, roleArn, role.PolicyDocument, role.PolicyArns, role.IAMGroups, ttl, roleSessionName, role.SessionTags, role.ExternalID)
 	case federationTokenCred:
 		return b.getFederationToken(ctx, req.Storage, req.DisplayName, roleName, role.PolicyDocument, role.PolicyArns, role.IAMGroups, ttl)
+	case sessionTokenCred:
+		return b.getSessionToken(ctx, req.Storage, role.SerialNumber, mfaCode, ttl)
 	default:
 		return logical.ErrorResponse(fmt.Sprintf("unknown credential_type: %q", credentialType)), nil
 	}
@@ -149,7 +175,7 @@ func (b *backend) pathUserRollback(ctx context.Context, req *logical.Request, _k
 	username := entry.UserName
 
 	// Get the client
-	client, err := b.clientIAM(ctx, req.Storage)
+	client, err := b.clientIAM(ctx, req.Storage, nil)
 	if err != nil {
 		return err
 	}
